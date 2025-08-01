@@ -13,7 +13,6 @@ spec:
     - type: Resource 
       resource:
         name: cpu 
-        targetPort: 
+        target:
           type: Utilization 
-          averageUtilization: 60 
-            
+          averageUtilization: 60
