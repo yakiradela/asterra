@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment 
+metadata: 
+  name: geojson-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geojson-processor
+    template:
+      metadata: 
+        labels:  
+          app: geojson-processor
+      spec: 
+        containers:
+          - name: geojson-processor
+            image: astera-ecr
+            ports:
+            - containerPort: 5000
+            envFrom:
+              - configMapRef:
+                  name: geojson-env 
