@@ -1,79 +1,66 @@
-name: Full AWS CI/CD Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
 
 env:
   AWS_REGION: us-east-2
   ECR_REPOSITORY: asterra-devops-repo
-  IMAGE_NAME: geojson-processor
-  HALF_PAGER_FILE: half-pager.md
-  HALF_PAGER_BUCKET: asterra-half-pager-public
+  IMAGE_TAG: latest
 
 jobs:
-  full-pipeline:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v3
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
 
-    - name: 🔐 Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: 🧱 Install GDAL system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+          export CPLUS_INCLUDE_PATH=/usr/include/gdal
+          export C_INCLUDE_PATH=/usr/include/gdal
 
-    - name: 🐍 Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-    - name: 📦 Install Python dependencies
-      run: |
-        pip install -r asterra/geojson-loader/requirements.txt
-        pip install pytest flake8 black
+      - name: 📦 Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r asterra/geojson-loader/requirements.txt
 
-    - name: ✅ Run code quality checks
-      run: |
-        black --check asterra/geojson-loader
-        flake8 asterra/geojson-loader --ignore=E501
+      - name: ✅ Run tests
+        run: |
+          pytest asterra/tests
 
-    - name: 🧪 Run unit tests
-      run: pytest asterra/tests/
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: 🔑 Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      - name: 🐳 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: 🐳 Build and push Docker image to ECR
-      env:
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
-        docker build -t $IMAGE_URI -f asterra/geojson-loader/Dockerfile .
-        docker push $IMAGE_URI
-        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+      - name: 🏗️ Build Docker image
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG asterra/geojson-loader
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: ⚙️ Install kubectl
-      uses: azure/setup-kubectl@v3
+      - name: 🚀 Push Docker image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: ☁️ Configure EKS kubectl context
-      run: |
-        aws eks update-kubeconfig \
-          --region $AWS_REGION \
-          --name ${{ secrets.EKS_CLUSTER_NAME }}
-
-    - name: 🚀 Deploy updated image to EKS
-      run: |
-        kubectl set image deployment/${{ env.IMAGE_NAME }} \
-          ${env.IMAGE_NAME}=${IMAGE_URI}
-        kubectl rollout status deployment/${{ env.IMAGE_NAME }}
-
-    - name: ☁️ Upload Half-Pager to public S3 bucket
-      run: |
-        aws s3 cp ${{ env.HALF_PAGER_FILE }} s3://${{ env.HALF_PAGER_BUCKET }}/half-pager.md --acl public-read
+      - name: ☁️ Deploy with kubectl
+        run: |
+          aws eks --region $AWS_REGION update-kubeconfig --name asterra-cluster
+          kubectl set image deployment/geojson-processor geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          kubectl rollout status deployment/geojson-processor
