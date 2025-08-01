@@ -1,0 +1,79 @@
+name: Full AWS CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: asterra-devops-repo
+  IMAGE_NAME: geojson-processor
+  HALF_PAGER_FILE: half-pager.md
+  HALF_PAGER_BUCKET: asterra-half-pager-public
+
+jobs:
+  full-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+
+    - name: 🔐 Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 Install Python dependencies
+      run: |
+        pip install -r asterra/geojson-loader/requirements.txt
+        pip install pytest flake8 black
+
+    - name: ✅ Run code quality checks
+      run: |
+        black --check asterra/geojson-loader
+        flake8 asterra/geojson-loader --ignore=E501
+
+    - name: 🧪 Run unit tests
+      run: pytest asterra/tests/
+
+    - name: 🔑 Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: 🐳 Build and push Docker image to ECR
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
+        docker build -t $IMAGE_URI -f asterra/geojson-loader/Dockerfile .
+        docker push $IMAGE_URI
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+    - name: ⚙️ Install kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: ☁️ Configure EKS kubectl context
+      run: |
+        aws eks update-kubeconfig \
+          --region $AWS_REGION \
+          --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+    - name: 🚀 Deploy updated image to EKS
+      run: |
+        kubectl set image deployment/${{ env.IMAGE_NAME }} \
+          ${env.IMAGE_NAME}=${IMAGE_URI}
+        kubectl rollout status deployment/${{ env.IMAGE_NAME }}
+
+    - name: ☁️ Upload Half-Pager to public S3 bucket
+      run: |
+        aws s3 cp ${{ env.HALF_PAGER_FILE }} s3://${{ env.HALF_PAGER_BUCKET }}/half-pager.md --acl public-read
