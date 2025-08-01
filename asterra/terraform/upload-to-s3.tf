@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "iac_storage" {
     bucket          = var.iac_storage_bucket
+    acl             = "private"
 }
 
 resource "aws_s3_bucket_object" "terraform" {
