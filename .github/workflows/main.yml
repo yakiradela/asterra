@@ -61,6 +61,12 @@ jobs:
           pip install --upgrade pip
           pip install -r asterra/geojson-loader/requirements.txt
 
+      - name: Install Pytest
+        run: pip install pytest
+
+      - name: Run Tests
+        run: pytest asterra/tests
+
       - name: Run pytest
         run: pytest asterra/tests
 
