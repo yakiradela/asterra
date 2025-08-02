@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Terraform + Build ✓ Test ✓ Deploy)
+name: CI/CD Pipeline (Terraform & Build & Test & Deploy)
 
 on:
   push:
