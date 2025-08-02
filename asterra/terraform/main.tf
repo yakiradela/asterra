@@ -55,7 +55,7 @@ resource "aws_rds_cluster" "postgres_cluster" {
   serverlessv2_scaling_configuration {
     min_capacity = 1
     max_capacity = 3
-
+  }
 }
 
 resource "aws_rds_cluster_instance" "postgres_instance" {
