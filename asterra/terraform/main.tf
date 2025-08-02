@@ -2,9 +2,16 @@ resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_subnet" "private_subnet" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
+resource "aws_subnet" "private_subnet_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-2a"
+}
+
+resource "aws_subnet" "private_subnet_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-2b"
 }
 
 resource "aws_security_group" "rdp_sg" {
@@ -28,20 +35,23 @@ resource "aws_security_group" "rdp_sg" {
 
 resource "aws_db_subnet_group" "private_subnet_group" {
   name       = "private-db-subnet-group"
-  subnet_ids = [aws_subnet.private_subnet.id]
+  subnet_ids = [
+    aws_subnet.private_subnet_a.id,
+    aws_subnet.private_subnet_b.id
+  ]
 }
 
 resource "aws_db_instance" "postgres" {
-  identifier              = "${var.project_name}-rds"
-  engine                  = "postgres"
-  engine_version          = "13.4"
-  instance_class          = "db.t3.small"                        # ← תוקן ל-type נכון
-  username                = var.db_username
-  password                = var.db_password
-  vpc_security_group_ids  = [aws_security_group.rdp_sg.id]
-  skip_final_snapshot     = true
-  publicly_accessible     = false
-  db_subnet_group_name    = aws_db_subnet_group.private_subnet_group.name
+  identifier             = "${var.project_name}-rds"
+  engine                 = "postgres"
+  engine_version         = "13.4"
+  instance_class         = "db.t3.small"                 # נכון: מחרוזת
+  username               = var.db_username
+  password               = var.db_password
+  vpc_security_group_ids = [aws_security_group.rdp_sg.id]
+  skip_final_snapshot    = true
+  publicly_accessible    = false
+  db_subnet_group_name   = aws_db_subnet_group.private_subnet_group.name
 }
 
 resource "aws_s3_bucket" "geojson_bucket" {
