@@ -34,7 +34,8 @@ resource "aws_security_group" "rdp_sg" {
 }
 
 resource "aws_db_subnet_group" "private_subnet_group" {
-  name       = "private-db-subnet-group"
+  # שם ייחודי כדי למנוע קונפליקט
+  name       = "private-db-subnet-group-${var.project_name}"
   subnet_ids = [
     aws_subnet.private_subnet_a.id,
     aws_subnet.private_subnet_b.id
@@ -45,21 +46,33 @@ resource "aws_db_instance" "postgres" {
   identifier             = "${var.project_name}-rds"
   engine                 = "postgres"
   engine_version         = "13.4"
-  instance_class         = "db.t3.small"                 # נכון: מחרוזת
+  instance_class         = "db.t3.small"
+  allocated_storage      = 20
+
   username               = var.db_username
   password               = var.db_password
   vpc_security_group_ids = [aws_security_group.rdp_sg.id]
-  skip_final_snapshot    = true
-  publicly_accessible    = false
-  db_subnet_group_name   = aws_db_subnet_group.private_subnet_group.name
+
+  skip_final_snapshot  = true
+  publicly_accessible  = false
+
+  db_subnet_group_name = aws_db_subnet_group.private_subnet_group.name
+}
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
+}
+
+resource "random_id" "ecr_suffix" {
+  byte_length = 4
 }
 
 resource "aws_s3_bucket" "geojson_bucket" {
-  bucket        = "${var.project_name}-geojson-input"
+  bucket        = "${var.project_name}-geojson-input-${random_id.bucket_suffix.hex}"
   force_destroy = true
 }
 
 resource "aws_ecr_repository" "ecr-repo" {
-  name = "${var.project_name}-repo"
+  name = "${var.project_name}-repo-${random_id.ecr_suffix.hex}"
 }
 
