@@ -1,29 +1,30 @@
 variable "aws_region" {
-    default =  "us-east-2" 
+  default = "us-east-2"
 }
 
 variable "project_name" {
-    default = "astera-devops"
+  default = "astera-devops"
 }
 
 variable "db_username" {
-    default = "asterauser"
+  default = "asterauser"
 }
 
 variable "db_password" {
-    default = "RDS database password"
-    sensitive = true 
+  default    = "RDS database password"
+  sensitive = true
 }
 
 variable "db_name" {
-    default = "astera_db"
+  default = "astera_db"
 }
 
 variable "allowed_rdp_ip" {
-    description = "CIDR block allowed to access RDP"
-    default = "0.0.0.0/24"  
+  description = "CIDR block allowed to access RDP"
+  # כתובת חוקית, ניתן לשנות לפי הצורך
+  default = "0.0.0.0/0"
 }
 
 variable "iac_storage_bucket" {
-    default = "astera-iac-storage"
+  default = "astera-iac-storage"
 }
