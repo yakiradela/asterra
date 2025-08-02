@@ -14,7 +14,7 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 WORKDIR /app
 COPY requirements.txt .
 
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade pip && setuptools==65.5.1 wheel && \
     pip install numpy==1.26.4 && \
     pip install --no-cache-dir -r requirements.txt
 
