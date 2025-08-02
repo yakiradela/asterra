@@ -18,7 +18,7 @@ def insert_geojson(geojson_data):
                     data JSONB
             )
         """)
-        cur.execute("INSERT INTO geo_data (data) VALUES (%s)", [json.dumps(geojson_data)])
+        cur.execute("INSERT INTO geojson_data (data) VALUES (%s)", [json.dumps(geojson_data)])
         conn.commit()
         cur.close()
         conn.close()
