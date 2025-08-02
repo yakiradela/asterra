@@ -1,65 +1,80 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (Terraform + Build & Deploy)
 
 on:
   push:
     branches: [ main ]
   pull_request:
 
+permissions:
+  id-token: write    # אם אתה משתמש ב־OIDC בגישה ל־AWS
+  contents: read
+
 env:
   AWS_REGION: us-east-2
   ECR_REPOSITORY: asterra-devops-repo
-  IMAGE_TAG: latest
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  build-test-deploy:
+  terraform-and-deploy:
+    name: Terraform → Build/Test → Deploy
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: ⬇️ Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🧱 Install GDAL system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gdal-bin libgdal-dev
-          export CPLUS_INCLUDE_PATH=/usr/include/gdal
-          export C_INCLUDE_PATH=/usr/include/gdal
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: 📦 Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r asterra/geojson-loader/requirements.txt
-
-      - name: ✅ Run tests
-        run: |
-          pytest asterra/tests
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v5
 
       - name: 🔐 Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
+          aws-region: ${{ env.AWS_REGION }}
+          # אם OIDC מוגדר — השאר את role-to-assume במקום התמיכה בקבצי סודות:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🐳 Login to Amazon ECR
+      - name: 🧩 Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.10
+
+      - name: ⚙️ Terraform Init
+        working-directory: terraform/
+        run: terraform init
+      - name: 📦 Terraform Apply (auto-approve)
+        working-directory: terraform/
+        run: terraform apply -auto-approve
+
+      # –––––––––––––––––––––––––––––––––
+      - name: 🧱 Install GDAL
+        run: |
+          sudo apt-get update && sudo apt-get install -y gdal-bin libgdal-dev
+          export CPLUS_INCLUDE_PATH=/usr/include/gdal
+          export C_INCLUDE_PATH=/usr/include/gdal
+
+      - name: 🐍 Setup Python & install deps
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: |
+          pip install --upgrade pip
+          pip install -r asterra/geojson-loader/requirements.txt
+
+      - name: ✅ Run tests
+        run: pytest asterra/tests
+
+      - name: 🐳 ECR Login
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 🏗️ Build Docker image
+      - name: 🏗️ Build & Push Docker
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG asterra/geojson-loader
           docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-
-      - name: 🚀 Push Docker image to ECR
-        run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: ☁️ Deploy with kubectl
+      - name: ☁️ Deploy to Kubernetes via kubectl
         run: |
           aws eks --region $AWS_REGION update-kubeconfig --name asterra-cluster
           kubectl set image deployment/geojson-processor geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
