@@ -7,7 +7,7 @@ resource "aws_s3_bucket_acl" "iac_storage_acl" {
   acl    = "private"
 }
 
-resource "aws_s3_bucket_object" "terraform" {
+resource "aws_s3_object" "terraform" {
   bucket = aws_s3_bucket.iac_storage.bucket
   key    = "terraform.zip"
   source = "../../terraform.zip"    
