@@ -21,7 +21,7 @@ variable "db_name" {
 
 variable "allowed_rdp_ip" {
     description = "CIDR block allowed to access RDP"
-    default = "/24"  
+    default = "0.0.0.0/24"  
 }
 
 variable "iac_storage_bucket" {
