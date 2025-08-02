@@ -2,15 +2,15 @@ name: CI/CD Pipeline (Terraform & Build & Test & Deploy)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 permissions:
-  id-token: write      # אם אתה משתמש ב-OIDC עם AWS अनुमान
+  id-token: write      # אם אתה משתמש ב-OIDC עם AWS
   contents: read       # נדרש עבור checkout
 
 env:
-  AWS_REGION: us‑east‑2
+  AWS_REGION: us-east-2
   ECR_REPOSITORY: asterra-devops-repo
   IMAGE_TAG: ${{ github.sha }}
 
@@ -70,21 +70,12 @@ jobs:
 
       - name: Build and Push Docker image
         run: |
-          docker build \
-            -t $ECR_REPOSITORY:$IMAGE_TAG \
-            asterra/geojson‑loader
-          docker tag \
-            $ECR_REPOSITORY:$IMAGE_TAG \
-            ${{ steps.login‑ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push \
-            ${{ steps.login‑ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG asterra/geojson-loader
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to Kubernetes
         run: |
-          aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name asterra-cluster
-          kubectl set image \
-            deployment/geojson-processor \
-            geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-          kubectl rollout status deployment geojson-processor
+          aws eks update-kubeconfig --region $AWS_REGION --name asterra-cluster
+          kubectl set image deployment/geojson-processor geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          kubectl rollout status deployment/geojson-processor
