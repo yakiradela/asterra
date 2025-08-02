@@ -7,16 +7,6 @@ ECR_URL="557690607676.dkr.ecr.us-east-2.amazonaws.com/asterra-devops-repo"
 
 echo "starting full deployment proces..."
 
-# =====Terraform=====
-echo "Initializing Terraform..."
-cd terraform
-terraform init 
-
-echo "Applying infrastructure..."
-terraform apply -auto-approve
-
-cd ..
-
 # =====PostGIS && Helm======
 echo "Installing PostgreSQL with PostGIS via Helm..."
 Helm repo add bitnami https://charts.binami.com/bitnami
