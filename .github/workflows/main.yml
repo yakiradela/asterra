@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Terraform + Build & Deploy)
+name: CI/CD Pipeline (Terraform + Build ✓ Test ✓ Deploy)
 
 on:
   push:
@@ -6,76 +6,85 @@ on:
   pull_request:
 
 permissions:
-  id-token: write    # אם אתה משתמש ב־OIDC בגישה ל־AWS
-  contents: read
+  id-token: write      # אם אתה משתמש ב-OIDC עם AWS अनुमान
+  contents: read       # נדרש עבור checkout
 
 env:
-  AWS_REGION: us-east-2
+  AWS_REGION: us‑east‑2
   ECR_REPOSITORY: asterra-devops-repo
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  terraform-and-deploy:
-    name: Terraform → Build/Test → Deploy
+  build-and-deploy:
+    name: 🚀 Terraform → Test → Deploy
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: ⬇️ Checkout repo
-        uses: actions/checkout@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: 🔐 Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: ${{ env.AWS_REGION }}
-          # אם OIDC מוגדר — השאר את role-to-assume במקום התמיכה בקבצי סודות:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: 🧩 Setup Terraform CLI
+      - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.10
 
-      - name: ⚙️ Terraform Init
+      - name: Terraform Init
         working-directory: terraform/
         run: terraform init
-      - name: 📦 Terraform Apply (auto-approve)
+
+      - name: Terraform Apply (auto-approve)
         working-directory: terraform/
         run: terraform apply -auto-approve
 
-      # –––––––––––––––––––––––––––––––––
-      - name: 🧱 Install GDAL
+      - name: Install system dependencies (GDAL)
         run: |
-          sudo apt-get update && sudo apt-get install -y gdal-bin libgdal-dev
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
           export CPLUS_INCLUDE_PATH=/usr/include/gdal
           export C_INCLUDE_PATH=/usr/include/gdal
 
-      - name: 🐍 Setup Python & install deps
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - run: |
+
+      - name: Install Python dependencies
+        run: |
           pip install --upgrade pip
           pip install -r asterra/geojson-loader/requirements.txt
 
-      - name: ✅ Run tests
+      - name: Run pytest
         run: pytest asterra/tests
 
-      - name: 🐳 ECR Login
+      - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 🏗️ Build & Push Docker
+      - name: Build and Push Docker image
         run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG asterra/geojson-loader
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build \
+            -t $ECR_REPOSITORY:$IMAGE_TAG \
+            asterra/geojson‑loader
+          docker tag \
+            $ECR_REPOSITORY:$IMAGE_TAG \
+            ${{ steps.login‑ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push \
+            ${{ steps.login‑ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: ☁️ Deploy to Kubernetes via kubectl
+      - name: Deploy to Kubernetes
         run: |
-          aws eks --region $AWS_REGION update-kubeconfig --name asterra-cluster
-          kubectl set image deployment/geojson-processor geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-          kubectl rollout status deployment/geojson-processor
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name asterra-cluster
+          kubectl set image \
+            deployment/geojson-processor \
+            geojson-processor=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          kubectl rollout status deployment geojson-processor
