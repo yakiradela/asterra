@@ -1,12 +1,16 @@
 resource "aws_s3_bucket" "iac_storage" {
-    bucket          = var.iac_storage_bucket
-    acl             = "private"
+  bucket = var.iac_storage_bucket
+}
+
+resource "aws_s3_bucket_acl" "iac_storage_acl" {
+  bucket = aws_s3_bucket.iac_storage.id
+  acl    = "private"
 }
 
 resource "aws_s3_bucket_object" "terraform" {
-    bucket          = aws_s3_bucket.iac_storage.bucket
-    key             = "terraform.zip"
-    source          = "../terraform.zip"
-    etag           = filemd5("../terraform.zip")  
+  bucket = aws_s3_bucket.iac_storage.bucket
+  key    = "terraform.zip"
+  source = "../../terraform.zip"    
+  etag   = filemd5("../../terraform.zip")
 }
 
