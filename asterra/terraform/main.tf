@@ -45,7 +45,7 @@ resource "aws_db_subnet_group" "private_subnet_group" {
 resource "aws_db_instance" "postgres" {
   identifier             = "${var.project_name}-rds"
   engine                 = "postgres"
-  engine_version         = "13.4"
+  engine_version         = "13.12"
   instance_class         = "db.t3.small"
   allocated_storage      = 20
 
