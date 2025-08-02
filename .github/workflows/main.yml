@@ -6,8 +6,8 @@ on:
   pull_request:
 
 permissions:
-  id-token: write      # אם אתה משתמש ב-OIDC עם AWS
-  contents: read       # נדרש עבור checkout
+  id-token: write
+  contents: read
 
 env:
   AWS_REGION: us-east-2
@@ -37,11 +37,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        working-directory: terraform/
+        working-directory: asterra/terraform/
         run: terraform init
 
       - name: Terraform Apply (auto-approve)
-        working-directory: terraform/
+        working-directory: asterra/terraform/
         run: terraform apply -auto-approve
 
       - name: Install system dependencies (GDAL)
