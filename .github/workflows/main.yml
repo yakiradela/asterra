@@ -42,7 +42,7 @@ jobs:
 
       - name: Terraform Apply (auto-approve)
         working-directory: asterra/terraform/
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -auto-approve -input=false -no-color
 
       - name: Install system dependencies (GDAL)
         run: |
