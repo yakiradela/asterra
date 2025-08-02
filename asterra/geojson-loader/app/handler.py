@@ -1,7 +1,7 @@
 import os
 from flask import Flask, request, jsonify
-from utlis import validate_geojson
-from db import insert_geojson
+from app.utlis import validate_geojson
+from app.db import insert_geojson
 
 app = Flask(__name__)
 
