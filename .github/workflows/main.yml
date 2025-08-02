@@ -13,6 +13,7 @@ env:
   AWS_REGION: us-east-2
   ECR_REPOSITORY: asterra-devops-repo
   IMAGE_TAG: ${{ github.sha }}
+  PYTHONPATH: ${{ github.workspace }}/asterra/geojson-loader
 
 jobs:
   build-and-deploy:
@@ -42,14 +43,12 @@ jobs:
 
       - name: Terraform Apply (auto-approve)
         working-directory: asterra/terraform/
-        run: terraform apply -auto-approve -auto-approve -input=false -no-color
+        run: terraform apply -auto-approve -input=false -no-color
 
       - name: Install system dependencies (GDAL)
         run: |
           sudo apt-get update
           sudo apt-get install -y gdal-bin libgdal-dev
-          export CPLUS_INCLUDE_PATH=/usr/include/gdal
-          export C_INCLUDE_PATH=/usr/include/gdal
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -58,16 +57,11 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
+          pip install --upgrade pip setuptools wheel
           pip install -r asterra/geojson-loader/requirements.txt
-
-      - name: Install Pytest
-        run: pip install pytest
+          pip install pytest
 
       - name: Run Tests
-        run: pytest asterra/tests
-
-      - name: Run pytest
         run: pytest asterra/tests
 
       - name: Login to ECR
