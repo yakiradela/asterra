@@ -34,45 +34,40 @@ resource "aws_security_group" "rdp_sg" {
 }
 
 resource "aws_db_subnet_group" "private_subnet_group" {
-  # שם ייחודי כדי למנוע קונפליקט
-  name       = "private-db-subnet-group-${var.project_name}"
+  name       = "private-db-subnet-group"
   subnet_ids = [
     aws_subnet.private_subnet_a.id,
     aws_subnet.private_subnet_b.id
   ]
 }
 
-resource "aws_db_instance" "postgres" {
-  identifier             = "${var.project_name}-rds"
-  engine                 = "postgres"
-  engine_version         = "13.20"
-  instance_class         = "db.t3.small"
-  allocated_storage      = 20
-
-  username               = var.db_username
-  password               = var.db_password
-  vpc_security_group_ids = [aws_security_group.rdp_sg.id]
-
-  skip_final_snapshot  = true
-  publicly_accessible  = false
-
-  db_subnet_group_name = aws_db_subnet_group.private_subnet_group.name
+resource "aws_rds_cluster" "postgres_cluster" {
+  cluster_identifier      = "${var.project_name}-cluster"
+  engine                  = "aurora-postgresql"
+  engine_version          = var.db_engine_version
+  master_username         = var.db_username
+  master_password         = var.db_password
+  db_subnet_group_name    = aws_db_subnet_group.private_subnet_group.name
+  vpc_security_group_ids  = [aws_security_group.rdp_sg.id]
+  skip_final_snapshot     = true
+  storage_encrypted       = true
 }
 
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
-}
-
-resource "random_id" "ecr_suffix" {
-  byte_length = 4
+resource "aws_rds_cluster_instance" "postgres_instance" {
+  count                   = var.db_instance_count
+  identifier              = "${var.project_name}-instance-${count.index + 1}"
+  cluster_identifier      = aws_rds_cluster.postgres_cluster.id
+  instance_class          = var.db_instance_class
+  engine                  = aws_rds_cluster.postgres_cluster.engine
+  engine_version          = aws_rds_cluster.postgres_cluster.engine_version
+  publicly_accessible     = false
 }
 
 resource "aws_s3_bucket" "geojson_bucket" {
-  bucket        = "${var.project_name}-geojson-input-${random_id.bucket_suffix.hex}"
+  bucket        = "${var.project_name}-geojson-input"
   force_destroy = true
 }
 
 resource "aws_ecr_repository" "ecr-repo" {
-  name = "${var.project_name}-repo-${random_id.ecr_suffix.hex}"
+  name = "${var.project_name}-repo"
 }
-
